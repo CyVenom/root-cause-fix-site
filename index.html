@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Root-Cause-Fix: find out why your deploy failed, with proof</title>
+<meta name="description" content="Reads build logs, diffs and env changes, names the root cause, and verifies every quoted piece of evidence before it answers.">
+<meta property="og:title" content="Root-Cause-Fix">
+<meta property="og:description" content="Your deploy failed. Here's the line that did it. Every quote is checked against the source before you see it.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0e0f0c">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#demo">Skip to demo</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="mark" href="#" aria-label="Root-Cause-Fix home"><span class="mark-dot" aria-hidden="true"></span>Root-Cause-Fix</a>
+    <nav aria-label="Primary">
+      <a href="#demo">Try it</a>
+      <a href="#how">How it works</a>
+      <a href="#evals">Evals</a>
+      <a href="#limits">Limits</a>
+      <a class="gh" href="https://github.com/CyVenom/Root-Cause-Fix" rel="noopener">GitHub &#8599;</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section class="hero wrap">
+  <div class="hero-copy">
+    <p class="eyebrow">Open source &middot; early alpha</p>
+    <h1>Your deploy failed.<br><em>Here&rsquo;s the line that did it.</em></h1>
+    <p class="lede">Root-Cause-Fix reads the build log, the diff since the last good deploy, and what changed in your environment. It names the cause and quotes the proof. Every quote is checked against the source before you see it.</p>
+    <div class="cta">
+      <a class="btn primary" href="#demo">Watch it diagnose a failure</a>
+      <a class="btn" href="https://github.com/CyVenom/Root-Cause-Fix" rel="noopener">View the code</a>
+    </div>
+    <p class="fine">MIT licensed. Read-only by design. Currently supports Vercel + GitHub.</p>
+  </div>
+
+  <figure class="hero-term" aria-label="Example diagnosis output">
+    <div class="term-bar"><span>diagnose &mdash; dpl_abc1234</span><span class="live" id="heroState">idle</span></div>
+    <pre id="heroTerm" class="term-body" aria-live="polite"></pre>
+  </figure>
+</section>
+
+<section class="problem wrap">
+  <div class="problem-grid">
+    <h2>The error is on screen.<br>The cause is somewhere else.</h2>
+    <div class="prose">
+      <p>A build fails and 400 lines scroll past. The real reason is usually small: a variable renamed in code but never set in production, a file renamed from <code>Header.tsx</code> to <code>header.tsx</code> that only breaks on Linux, a lockfile that drifted from <code>package.json</code>.</p>
+      <p>Finding it means correlating the log, the commit diff and the settings by hand, often late at night. A chatbot can guess, but a confident wrong guess is worse than no answer.</p>
+      <p><strong>So this tool shows its work.</strong> Each claim comes with the exact line it relies on, and a check confirms that line exists.</p>
+    </div>
+  </div>
+</section>
+
+<section id="demo" class="demo wrap" aria-labelledby="demoH">
+  <div class="sec-head">
+    <p class="eyebrow">Interactive</p>
+    <h2 id="demoH">Pick a failure. Run the diagnosis.</h2>
+    <p class="sub">These are the nine failures from the project&rsquo;s eval suite. The logs and diffs are the real test files. The answers shown are the reference answers for each case. <strong>No model is called on this page.</strong></p>
+  </div>
+
+  <div class="console">
+    <div class="cases" role="tablist" aria-label="Failure cases" id="caseList"></div>
+
+    <div class="work">
+      <div class="case-head">
+        <div>
+          <h3 id="caseTitle"></h3>
+          <p id="caseBlurb" class="muted"></p>
+        </div>
+        <div class="case-meta mono" id="caseMeta"></div>
+      </div>
+
+      <div class="panes">
+        <div class="pane">
+          <div class="pane-h"><span>Build log</span><span class="muted mono" id="logCount"></span></div>
+          <div class="code" id="logPane" tabindex="0" aria-label="Build log"></div>
+        </div>
+        <div class="pane">
+          <div class="pane-h"><span>Diff since last good deploy</span><span class="muted mono" id="diffCount"></span></div>
+          <div class="code" id="diffPane" tabindex="0" aria-label="Code diff"></div>
+        </div>
+      </div>
+      <div class="envbar"><span class="pane-h-inline">Env var changes</span><span id="envPane" class="mono"></span></div>
+
+      <div class="actions">
+        <button class="btn primary" id="runBtn" type="button">Run diagnosis</button>
+        <label class="toggle"><input type="checkbox" id="fakeToggle"> Make one quote up <span class="muted">(see the check catch it)</span></label>
+      </div>
+
+      <div class="verdict" id="verdict" aria-live="polite" hidden>
+        <div class="v-row"><span class="v-k">Cause</span><span class="v-v" id="vCause"></span></div>
+        <div class="v-row"><span class="v-k">Evidence</span><div class="v-v" id="vEvidence"></div></div>
+        <div class="v-row"><span class="v-k">Fix</span><span class="v-v" id="vFix"></span></div>
+        <div class="v-row"><span class="v-k">Confidence</span><span class="v-v" id="vConf"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="how wrap" aria-labelledby="howH">
+  <div class="sec-head">
+    <p class="eyebrow">How it works</p>
+    <h2 id="howH">Five steps. The last one is the one that matters.</h2>
+  </div>
+  <ol class="steps">
+    <li><span class="n">01</span><div><h3>Collect</h3><p>Pulls the failed deploy&rsquo;s build log, the diff between the last good commit and the failed one, and the <em>names</em> of environment variables that changed. Values are never read.</p></div></li>
+    <li><span class="n">02</span><div><h3>Redact</h3><p>Strips keys, tokens, JWTs, connection strings and emails before anything leaves your machine. Try it below.</p></div></li>
+    <li><span class="n">03</span><div><h3>Reduce</h3><p>Keeps the error region of long logs and ranks diff files by whether the log mentions them, so the model sees signal instead of 10,000 lines of noise.</p></div></li>
+    <li><span class="n">04</span><div><h3>Diagnose</h3><p>An LLM answers in a strict format: cause, evidence quotes, fix, confidence. It is told to copy quotes character for character and to say so when it is unsure.</p></div></li>
+    <li class="key"><span class="n">05</span><div><h3>Verify</h3><p>Each evidence quote is searched for in the original log, diff and env changes. If one isn&rsquo;t there, the diagnosis is downgraded to low confidence and flagged. This is the step you can test in the demo above.</p></div></li>
+  </ol>
+
+  <div class="redact" id="redact">
+    <div class="sec-head slim">
+      <h3>Redaction playground</h3>
+      <p class="sub">Edit the text. Redaction runs in your browser with the same patterns as the engine. Nothing is sent anywhere. The sample secrets are fake.</p>
+    </div>
+    <div class="redact-grid">
+      <label class="rbox"><span class="pane-h-inline">What the build log contains</span>
+        <textarea id="rIn" spellcheck="false" rows="9"></textarea></label>
+      <div class="rbox"><span class="pane-h-inline">What the model would see</span>
+        <pre id="rOut" class="rout" aria-live="polite"></pre></div>
+    </div>
+  </div>
+</section>
+
+<section id="evals" class="evals wrap" aria-labelledby="evalH">
+  <div class="sec-head">
+    <p class="eyebrow">Measured, not claimed</p>
+    <h2 id="evalH">Every prompt change gets scored.</h2>
+    <p class="sub">Each case has a known root cause. A run counts as correct only if the answer names it, and as verified only if every quote checks out.</p>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Correct</th><th>Evidence verified</th><th>Approx. cost, full run</th></tr></thead>
+    <tbody>
+      <tr><td>Haiku 4.5</td><td>9 / 9</td><td>9 / 9</td><td class="mono">~$0.016</td></tr>
+      <tr><td>Sonnet 4.5</td><td>9 / 9</td><td>9 / 9</td><td class="mono">~$0.043</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="honest"><strong>Read this honestly.</strong> Nine hand-written cases is a small, easy test, and both models ace it, so it can&rsquo;t tell them apart. Costs are estimates from token counts and list prices. Real-world accuracy will be lower. The first run did expose real problems: models paraphrased diff lines instead of quoting them (5 of 9 verified on the cheaper model), and one reply had malformed JSON. Both were fixed and re-measured. The most useful thing you can add is a harder, real failure.</p>
+</section>
+
+<section id="limits" class="limits wrap" aria-labelledby="limH">
+  <div class="two">
+    <div>
+      <p class="eyebrow">Limits</p>
+      <h2 id="limH">What it doesn&rsquo;t do yet.</h2>
+      <ul class="plain">
+        <li>Vercel is the only supported host.</li>
+        <li>Build failures only. No runtime errors, cron jobs or webhooks.</li>
+        <li>Deleted env vars can&rsquo;t be seen through Vercel&rsquo;s list API.</li>
+        <li>It diagnoses. It doesn&rsquo;t open fix pull requests yet.</li>
+        <li>The evidence check catches made-up quotes, not flawed reasoning. Treat the answer as a strong lead.</li>
+      </ul>
+    </div>
+    <div>
+      <p class="eyebrow">Roadmap</p>
+      <h2>Where it&rsquo;s going.</h2>
+      <ul class="road">
+        <li class="done">Diagnosis pipeline with evidence validation</li>
+        <li class="done">Eval harness with model comparison</li>
+        <li class="done">Vercel + GitHub collectors and account scan</li>
+        <li>Watcher: diagnose new failed deploys automatically</li>
+        <li>Slack notifications</li>
+        <li>Dashboard with right / wrong feedback</li>
+        <li>Remember repeat failures</li>
+        <li>Suggested fix as a pull request</li>
+        <li>More hosts and GitHub Actions failures</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="close wrap">
+  <h2>Run it on your own failed deploy.</h2>
+  <pre class="install" id="installBox"><code>git clone https://github.com/CyVenom/Root-Cause-Fix.git
+cd Root-Cause-Fix
+npm test
+npm run diagnose -- packages/core/fixtures/missing-env-var --mock</code></pre>
+  <p class="fine">Needs Node.js 22.18+. No dependencies to install. The <code>--mock</code> flag runs offline for free; add an API key in <code>.env</code> to use a real model.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/CyVenom/Root-Cause-Fix" rel="noopener">Star it on GitHub</a>
+    <a class="btn" href="https://github.com/CyVenom/Root-Cause-Fix#contributing" rel="noopener">Add a failure case</a>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span>Root-Cause-Fix &middot; MIT License</span>
+    <a href="https://github.com/CyVenom/Root-Cause-Fix" rel="noopener">github.com/CyVenom/Root-Cause-Fix</a>
+  </div>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
